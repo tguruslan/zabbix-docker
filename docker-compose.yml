@@ -1,0 +1,90 @@
+version: '2'
+
+volumes:
+  db:
+
+networks:
+  zabbix_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+
+services:
+  db:
+    container_name: zabbix_db
+    hostname: zabbix_db
+    image: mysql:latest
+    restart: always
+    volumes:
+      - db:/var/lib/mysql
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_PASSWORD=zabbix
+      - MYSQL_DATABASE=zabbix
+      - MYSQL_USER=zabbix
+    networks:
+      zabbix_net:
+        ipv4_address: 172.28.0.2
+
+  app:
+    container_name: zabbix_app
+    hostname: zabbix_app
+    image: zabbix/zabbix-server-mysql:latest
+    ports:
+      - 10051:10051
+    restart: always
+    environment:
+      - DB_SERVER_HOST=172.28.0.2
+      - MYSQL_DATABASE=zabbix
+      - MYSQL_USER=zabbix
+      - MYSQL_PASSWORD=zabbix
+      - MYSQL_ROOT_PASSWORD=root
+    links:
+      - db
+    networks:
+      zabbix_net:
+        ipv4_address: 172.28.0.3
+
+  web:
+    container_name: zabbix_web
+    hostname: zabbix_web
+    image: zabbix/zabbix-web-apache-mysql:latest
+    ports:
+      - 80:80
+    links:
+      - db
+      - app
+    restart: always
+    environment:
+      - DB_SERVER_HOST=172.28.0.2
+      - MYSQL_USER=zabbix
+      - MYSQL_PASSWORD=zabbix
+      - ZBX_SERVER_HOST=172.28.0.3
+      - ZBX_SERVER_NAME=MyZabbix
+      - PHP_TZ="Europe/Kiev"
+    networks:
+      zabbix_net:
+        ipv4_address: 172.28.0.4
+
+  grafana:
+    container_name: grafana
+    hostname: grafana
+    image: grafana/grafana:latest
+    ports:
+      - 3000:3000
+    links:
+      - web
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=secret
+    networks:
+      zabbix_net:
+        ipv4_address: 172.28.0.5
+
+# docker exec -it zabbix_db mysql -u root -p -e "ALTER USER 'zabbix' IDENTIFIED WITH mysql_native_password BY 'zabbix';"
+# docker exec -it grafana grafana-cli plugins install alexanderzobnin-zabbix-app
