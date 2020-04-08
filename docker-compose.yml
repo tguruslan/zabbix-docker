@@ -2,6 +2,9 @@ version: '2'
 
 volumes:
   db:
+  certs:
+  vhost.d:
+  html:
 
 networks:
   zabbix_net:
@@ -14,14 +17,12 @@ networks:
 
 services:
   db:
+    image: mysql:latest
     container_name: zabbix_db
     hostname: zabbix_db
-    image: mysql:latest
     restart: always
     volumes:
       - db:/var/lib/mysql
-    ports:
-      - 3306:3306
     environment:
       - MYSQL_ROOT_PASSWORD=root
       - MYSQL_PASSWORD=zabbix
@@ -46,6 +47,8 @@ services:
       - MYSQL_ROOT_PASSWORD=root
     links:
       - db
+    volumes:
+      - ./scripts:/usr/lib/zabbix/
     networks:
       zabbix_net:
         ipv4_address: 172.28.0.3
@@ -54,8 +57,6 @@ services:
     container_name: zabbix_web
     hostname: zabbix_web
     image: zabbix/zabbix-web-apache-mysql:latest
-    ports:
-      - 80:80
     links:
       - db
       - app
@@ -67,6 +68,9 @@ services:
       - ZBX_SERVER_HOST=172.28.0.3
       - ZBX_SERVER_NAME=MyZabbix
       - PHP_TZ="Europe/Kiev"
+      - VIRTUAL_HOST=domain.example.xy
+      - LETSENCRYPT_HOST=domain.example.xy
+      - LETSENCRYPT_EMAIL=mail@example.xy
     networks:
       zabbix_net:
         ipv4_address: 172.28.0.4
@@ -86,5 +90,33 @@ services:
       zabbix_net:
         ipv4_address: 172.28.0.5
 
-# docker exec -it zabbix_db mysql -u root -p -e "ALTER USER 'zabbix' IDENTIFIED WITH mysql_native_password BY 'zabbix';"
-# docker exec -it grafana grafana-cli plugins install alexanderzobnin-zabbix-app
+  proxy:
+    build: ./proxy
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    labels:
+      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+    volumes:
+      - certs:/etc/nginx/certs:ro
+      - vhost.d:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      zabbix_net:
+        ipv4_address: 172.28.0.6
+
+  letsencrypt-companion:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: always
+    volumes:
+      - certs:/etc/nginx/certs
+      - vhost.d:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      zabbix_net:
+        ipv4_address: 172.28.0.7
+    depends_on:
+      - proxy
