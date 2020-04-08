@@ -2,4 +2,5 @@
 
 docker exec -it zabbix_db mysql -u root --password=root -e "ALTER USER 'zabbix' IDENTIFIED WITH mysql_native_password BY 'zabbix';"
 docker exec -it grafana grafana-cli plugins install alexanderzobnin-zabbix-app
+docker restart grafana
 docker exec -u 0 zabbix_app apk add curl
