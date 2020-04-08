@@ -48,7 +48,8 @@ services:
     links:
       - db
     volumes:
-      - ./scripts:/usr/lib/zabbix/
+      - ./scripts/externalscripts:/usr/lib/zabbix/externalscripts
+      - ./scripts/alertscripts:/usr/lib/zabbix/alertscripts
     networks:
       zabbix_net:
         ipv4_address: 172.28.0.3
