@@ -5,6 +5,7 @@ volumes:
   certs:
   vhost.d:
   html:
+  grafana:
 
 networks:
   zabbix_net:
@@ -24,10 +25,10 @@ services:
     volumes:
       - db:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_PASSWORD=zabbix
-      - MYSQL_DATABASE=zabbix
-      - MYSQL_USER=zabbix
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_PASSWORD==${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
     networks:
       zabbix_net:
         ipv4_address: 172.28.0.2
@@ -41,10 +42,10 @@ services:
     restart: always
     environment:
       - DB_SERVER_HOST=172.28.0.2
-      - MYSQL_DATABASE=zabbix
-      - MYSQL_USER=zabbix
-      - MYSQL_PASSWORD=zabbix
-      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
     links:
       - db
     volumes:
@@ -64,14 +65,14 @@ services:
     restart: always
     environment:
       - DB_SERVER_HOST=172.28.0.2
-      - MYSQL_USER=zabbix
-      - MYSQL_PASSWORD=zabbix
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - ZBX_SERVER_HOST=172.28.0.3
       - ZBX_SERVER_NAME=MyZabbix
       - PHP_TZ="Europe/Kiev"
-      - VIRTUAL_HOST=domain.example.xy
-      - LETSENCRYPT_HOST=domain.example.xy
-      - LETSENCRYPT_EMAIL=mail@example.xy
+      - VIRTUAL_HOST=${DOMAIN}
+      - LETSENCRYPT_HOST=${DOMAIN}
+      - LETSENCRYPT_EMAIL=${MAIL}
     networks:
       zabbix_net:
         ipv4_address: 172.28.0.4
@@ -85,8 +86,15 @@ services:
     links:
       - web
     restart: always
+    volumes:
+      - certs:/etc/letsencrypt/certs:ro
+      - grafana:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=secret
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SERVER_CERT_FILE=/etc/letsencrypt/certs/${DOMAIN}.crt
+      - GF_SERVER_CERT_KEY=/etc/letsencrypt/certs/${DOMAIN}.key
+      - GF_SERVER_PROTOCOL=https
     networks:
       zabbix_net:
         ipv4_address: 172.28.0.5
