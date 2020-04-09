@@ -1,4 +1,4 @@
-version: '2'
+version: '3'
 
 volumes:
   db:
@@ -7,53 +7,39 @@ volumes:
   html:
   grafana:
 
-networks:
-  zabbix_net:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.28.0.0/24
-          gateway: 172.28.0.1
-
 services:
   db:
     image: mysql:latest
     container_name: zabbix_db
     hostname: zabbix_db
     restart: always
+    command: ["mysqld", "--default-authentication-plugin=mysql_native_password"]
     volumes:
       - db:/var/lib/mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_PASSWORD==${MYSQL_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-    networks:
-      zabbix_net:
-        ipv4_address: 172.28.0.2
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
 
   app:
     container_name: zabbix_app
     hostname: zabbix_app
-    image: zabbix/zabbix-server-mysql:latest
+    build: ./server
     ports:
       - 10051:10051
     restart: always
     environment:
-      - DB_SERVER_HOST=172.28.0.2
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      DB_SERVER_HOST: db
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     links:
       - db
     volumes:
       - ./scripts/externalscripts:/usr/lib/zabbix/externalscripts
       - ./scripts/alertscripts:/usr/lib/zabbix/alertscripts
-    networks:
-      zabbix_net:
-        ipv4_address: 172.28.0.3
 
   web:
     container_name: zabbix_web
@@ -64,23 +50,20 @@ services:
       - app
     restart: always
     environment:
-      - DB_SERVER_HOST=172.28.0.2
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - ZBX_SERVER_HOST=172.28.0.3
-      - ZBX_SERVER_NAME=MyZabbix
-      - PHP_TZ="Europe/Kiev"
-      - VIRTUAL_HOST=${DOMAIN}
-      - LETSENCRYPT_HOST=${DOMAIN}
-      - LETSENCRYPT_EMAIL=${MAIL}
-    networks:
-      zabbix_net:
-        ipv4_address: 172.28.0.4
+      DB_SERVER_HOST: db
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      ZBX_SERVER_HOST: 172.28.0.3
+      ZBX_SERVER_NAME: MyZabbix
+      PHP_TZ: "Europe/Kiev"
+      VIRTUAL_HOST: ${DOMAIN}
+      LETSENCRYPT_HOST: ${DOMAIN}
+      LETSENCRYPT_EMAIL: ${MAIL}
 
   grafana:
     container_name: grafana
     hostname: grafana
-    image: grafana/grafana:latest
+    build: ./grafana
     ports:
       - 3000:3000
     links:
@@ -90,14 +73,11 @@ services:
       - certs:/etc/letsencrypt/certs:ro
       - grafana:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-      - GF_SERVER_CERT_FILE=/etc/letsencrypt/certs/${DOMAIN}.crt
-      - GF_SERVER_CERT_KEY=/etc/letsencrypt/certs/${DOMAIN}.key
-      - GF_SERVER_PROTOCOL=https
-    networks:
-      zabbix_net:
-        ipv4_address: 172.28.0.5
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_SERVER_CERT_FILE: /etc/letsencrypt/certs/${DOMAIN}.crt
+      GF_SERVER_CERT_KEY: /etc/letsencrypt/certs/${DOMAIN}.key
+      GF_SERVER_PROTOCOL: https
 
   proxy:
     build: ./proxy
@@ -112,9 +92,6 @@ services:
       - vhost.d:/etc/nginx/vhost.d
       - html:/usr/share/nginx/html
       - /var/run/docker.sock:/tmp/docker.sock:ro
-    networks:
-      zabbix_net:
-        ipv4_address: 172.28.0.6
 
   letsencrypt-companion:
     image: jrcs/letsencrypt-nginx-proxy-companion
@@ -124,8 +101,5 @@ services:
       - vhost.d:/etc/nginx/vhost.d
       - html:/usr/share/nginx/html
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      zabbix_net:
-        ipv4_address: 172.28.0.7
     depends_on:
       - proxy
