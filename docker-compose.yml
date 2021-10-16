@@ -8,21 +8,20 @@ volumes:
   grafana:
 
 services:
-  db:
-    image: mysql:latest
+  zabbix_db:
+    image: postgres:13
     container_name: zabbix_db
     hostname: zabbix_db
     restart: always
-    command: ["mysqld", "--default-authentication-plugin=mysql_native_password"]
     volumes:
-      - db:/var/lib/mysql
+      - db:/var/lib/postgresql/data
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
+      POSTGRES_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DATABASE: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USER}
 
-  app:
+  zabbix_app:
     container_name: zabbix_app
     hostname: zabbix_app
     build: ./server
@@ -30,44 +29,45 @@ services:
       - 10051:10051
     restart: always
     environment:
-      DB_SERVER_HOST: db
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      DB_SERVER_HOST: zabbix_db
+      POSTGRES_DATABASE: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     links:
-      - db
+      - zabbix_db
     volumes:
       - ./scripts/externalscripts:/usr/lib/zabbix/externalscripts
       - ./scripts/alertscripts:/usr/lib/zabbix/alertscripts
 
-  web:
+  zabbix_web:
     container_name: zabbix_web
     hostname: zabbix_web
-    image: zabbix/zabbix-web-apache-mysql:latest
+    image: zabbix/zabbix-web-nginx-pgsql:latest
     links:
-      - db
-      - app
+      - zabbix_db
+      - zabbix_app
     restart: always
     environment:
-      DB_SERVER_HOST: db
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      ZBX_SERVER_HOST: app
+      DB_SERVER_HOST: zabbix_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      ZBX_SERVER_HOST: zabbix_app
       ZBX_SERVER_NAME: MyZabbix
       PHP_TZ: "Europe/Kiev"
       VIRTUAL_HOST: ${DOMAIN}
+      VIRTUAL_PORT: 8080
       LETSENCRYPT_HOST: ${DOMAIN}
       LETSENCRYPT_EMAIL: ${MAIL}
 
-  grafana:
-    container_name: grafana
-    hostname: grafana
+  zabbix_grafana:
+    container_name: zabbix_grafana
+    hostname: zabbix_grafana
     build: ./grafana
     ports:
       - 3000:3000
     links:
-      - web
+      - zabbix_web
     restart: always
     volumes:
       - certs:/etc/letsencrypt/certs:ro
@@ -79,8 +79,10 @@ services:
       GF_SERVER_CERT_KEY: /etc/letsencrypt/certs/${DOMAIN}.key
       GF_SERVER_PROTOCOL: https
 
-  proxy:
+  zabbix_proxy:
     build: ./proxy
+    container_name: zabbix_proxy
+    hostname: zabbix_proxy
     restart: always
     ports:
       - 80:80
@@ -102,4 +104,4 @@ services:
       - html:/usr/share/nginx/html
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
-      - proxy
+      - zabbix_proxy
