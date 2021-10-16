@@ -3,7 +3,7 @@
 source .env
 
 if [[ $1 != "" ]]; then
-  cat $1 | docker exec -i zabbix_db /usr/bin/pg_dump --superuser=$DB_USER --password=$DB_PASSWORD $DB_DATABASE
+  cat $1 | docker exec -i zabbix_db /usr/bin/pg_dump --dbname="postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_DATABASE}"
 else
-  docker exec zabbix_db /usr/bin/pg_dump --superuser=$DB_USER --password=$DB_PASSWORD $DB_DATABASE > zabbix-$(date +%F).sql
+  docker exec zabbix_db /usr/bin/pg_dump --dbname="postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_DATABASE}" > zabbix-$(date +%F).sql
 fi
