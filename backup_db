@@ -3,7 +3,7 @@
 source .env
 
 if [[ $1 != "" ]]; then
-  cat $1 | docker exec -i zabbix_db /usr/bin/mysql -u $MYSQL_USER --password=$MYSQL_PASSWORD $MYSQL_DATABASE
+  cat $1 | docker exec -i zabbix_db /usr/bin/pg_dump --superuser=$DB_USER --password=$DB_PASSWORD $DB_DATABASE
 else
-  docker exec zabbix_db /usr/bin/mysqldump -u $MYSQL_USER --password=$MYSQL_PASSWORD $MYSQL_DATABASE > zabbix-$(date +%F).sql
+  docker exec zabbix_db /usr/bin/pg_dump --superuser=$DB_USER --password=$DB_PASSWORD $DB_DATABASE > zabbix-$(date +%F).sql
 fi
