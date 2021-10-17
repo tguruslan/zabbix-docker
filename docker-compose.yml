@@ -1,36 +1,22 @@
 version: '3'
 
-volumes:
-  db:
-  certs:
-  vhost.d:
-  html:
-  grafana:
-
-networks:
-  zabbix:
-    driver: bridge
-    ipam:
-     config:
-       - subnet: 10.0.0.0/24
-         gateway: 10.0.0.1
-
 services:
   zabbix_db:
     image: postgres:13
     container_name: zabbix_db
     hostname: zabbix_db
     restart: always
+    ports:
+      - 5432:5432
     volumes:
-      - db:/var/lib/postgresql/data
+      - ./db:/var/lib/postgresql/data
     environment:
       POSTGRES_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DATABASE: ${DB_DATABASE}
       POSTGRES_USER: ${DB_USER}
     networks:
-      zabbix:
-        ipv4_address: 10.0.0.2
+      - zabbix_net
 
   zabbix_app:
     container_name: zabbix_app
@@ -47,12 +33,8 @@ services:
       POSTGRES_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     links:
       - zabbix_db
-    volumes:
-      - ./scripts/externalscripts:/usr/lib/zabbix/externalscripts
-      - ./scripts/alertscripts:/usr/lib/zabbix/alertscripts
     networks:
-      zabbix:
-        ipv4_address: 10.0.0.3
+      - zabbix_net
 
   zabbix_web:
     container_name: zabbix_web
@@ -62,6 +44,8 @@ services:
       - zabbix_db
       - zabbix_app
     restart: always
+    ports:
+      - 8080:8080
     environment:
       DB_SERVER_HOST: zabbix_db
       POSTGRES_USER: ${DB_USER}
@@ -69,68 +53,8 @@ services:
       ZBX_SERVER_HOST: zabbix_app
       ZBX_SERVER_NAME: MyZabbix
       PHP_TZ: "Europe/Kiev"
-      VIRTUAL_HOST: ${DOMAIN}
-      VIRTUAL_PORT: 8080
-      LETSENCRYPT_HOST: ${DOMAIN}
-      LETSENCRYPT_EMAIL: ${MAIL}
     networks:
-      zabbix:
-        ipv4_address: 10.0.0.4
+      - zabbix_net
 
-
-  zabbix_grafana:
-    container_name: zabbix_grafana
-    hostname: zabbix_grafana
-    build: ./grafana
-    ports:
-      - 3000:3000
-    links:
-      - zabbix_web
-    restart: always
-    volumes:
-      - certs:/etc/letsencrypt/certs:ro
-      - grafana:/var/lib/grafana
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-      GF_SERVER_CERT_FILE: /etc/letsencrypt/certs/${DOMAIN}.crt
-      GF_SERVER_CERT_KEY: /etc/letsencrypt/certs/${DOMAIN}.key
-      GF_SERVER_PROTOCOL: https
-    networks:
-      zabbix:
-        ipv4_address: 10.0.0.5
-
-
-  zabbix_proxy:
-    build: ./proxy
-    container_name: zabbix_proxy
-    hostname: zabbix_proxy
-    restart: always
-    ports:
-      - 80:80
-      - 443:443
-    labels:
-      com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
-    volumes:
-      - certs:/etc/nginx/certs:ro
-      - vhost.d:/etc/nginx/vhost.d
-      - html:/usr/share/nginx/html
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-    networks:
-      zabbix:
-        ipv4_address: 10.0.0.6
-
-
-  letsencrypt-companion:
-    image: jrcs/letsencrypt-nginx-proxy-companion
-    restart: always
-    volumes:
-      - certs:/etc/nginx/certs
-      - vhost.d:/etc/nginx/vhost.d
-      - html:/usr/share/nginx/html
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    depends_on:
-      - zabbix_proxy
-    networks:
-      zabbix:
-        ipv4_address: 10.0.0.7
+networks:
+  zabbix_net:
