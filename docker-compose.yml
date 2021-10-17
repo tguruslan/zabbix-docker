@@ -131,3 +131,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - zabbix_proxy
+    networks:
+      zabbix:
+        ipv4_address: 10.0.0.7
