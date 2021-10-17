@@ -7,6 +7,14 @@ volumes:
   html:
   grafana:
 
+networks:
+  zabbix:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: 10.0.0.0/24
+         gateway: 10.0.0.1
+
 services:
   zabbix_db:
     image: postgres:13
@@ -20,6 +28,9 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DATABASE: ${DB_DATABASE}
       POSTGRES_USER: ${DB_USER}
+    networks:
+      zabbix:
+        ipv4_address: 10.0.0.2
 
   zabbix_app:
     container_name: zabbix_app
@@ -39,6 +50,9 @@ services:
     volumes:
       - ./scripts/externalscripts:/usr/lib/zabbix/externalscripts
       - ./scripts/alertscripts:/usr/lib/zabbix/alertscripts
+    networks:
+      zabbix:
+        ipv4_address: 10.0.0.3
 
   zabbix_web:
     container_name: zabbix_web
@@ -59,6 +73,10 @@ services:
       VIRTUAL_PORT: 8080
       LETSENCRYPT_HOST: ${DOMAIN}
       LETSENCRYPT_EMAIL: ${MAIL}
+    networks:
+      zabbix:
+        ipv4_address: 10.0.0.4
+
 
   zabbix_grafana:
     container_name: zabbix_grafana
@@ -78,6 +96,10 @@ services:
       GF_SERVER_CERT_FILE: /etc/letsencrypt/certs/${DOMAIN}.crt
       GF_SERVER_CERT_KEY: /etc/letsencrypt/certs/${DOMAIN}.key
       GF_SERVER_PROTOCOL: https
+    networks:
+      zabbix:
+        ipv4_address: 10.0.0.5
+
 
   zabbix_proxy:
     build: ./proxy
@@ -94,6 +116,10 @@ services:
       - vhost.d:/etc/nginx/vhost.d
       - html:/usr/share/nginx/html
       - /var/run/docker.sock:/tmp/docker.sock:ro
+    networks:
+      zabbix:
+        ipv4_address: 10.0.0.6
+
 
   letsencrypt-companion:
     image: jrcs/letsencrypt-nginx-proxy-companion
